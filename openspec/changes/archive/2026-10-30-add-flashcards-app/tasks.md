@@ -47,7 +47,7 @@
 ## 8. Responsive et PWA
 
 - [x] 8.1 Mise en page responsive dès 360 px (zones tactiles, carte visible au-dessus du clavier virtuel) ; vérifier dans l'émulation mobile du navigateur à 360 px sans défilement horizontal
-- [ ] 8.2 Configurer vite-plugin-pwa (manifeste, icônes 192/512, pré-cache, `autoUpdate`, `base` du sous-chemin GitHub Pages) ; vérifier avec `npm run build && npm run preview` que l'application se recharge hors-ligne et que Lighthouse la déclare installable
+- [x] 8.2 Configurer vite-plugin-pwa (manifeste, icônes 192/512, pré-cache, `autoUpdate`, `base` du sous-chemin GitHub Pages) ; vérifier avec `npm run build && npm run preview` que l'application se recharge hors-ligne et que Lighthouse la déclare installable
 
 ## 9. Publication
 
@@ -57,7 +57,7 @@
 ## 10. Vérification d'ensemble
 
 - [x] 10.1 Parcours complet sur PC : import d'un CSV d'exemple, session mélangée, export, réimport ; vérifier que la progression est conservée
-- [ ] 10.2 Parcours sur téléphone (application publiée) : installation sur l'écran d'accueil, import du CSV exporté depuis le PC via un drive, révision hors-ligne ; vérifier que la progression importée correspond à celle du PC
+- [x] 10.2 Parcours sur téléphone (application publiée) : installation sur l'écran d'accueil, import du CSV exporté depuis le PC via un drive, révision hors-ligne ; vérifier que la progression importée correspond à celle du PC
 - [x] 10.3 Vérifier qu'aucune requête réseau ne transmet de vocabulaire (onglet Réseau pendant import et révision) et que `openspec validate add-flashcards-app --strict` réussit
 
 ## Suivi du workflow
