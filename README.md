@@ -2,7 +2,7 @@
 
 Application web de flashcards pour réviser du vocabulaire bilingue, alimentée par un fichier CSV. Elle fonctionne dans le navigateur (PC, téléphone, tablette), s'installe sur l'écran d'accueil et marche hors-ligne. Aucune donnée ne quitte l'appareil.
 
-Version publiée : `https://<compte>.github.io/voc_trainer/`
+Version publiée : https://bhenriet.github.io/voc_trainer/
 
 ## Format du fichier CSV
 

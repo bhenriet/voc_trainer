@@ -108,7 +108,7 @@ Mode `generateSW` avec pré-cache de tous les fichiers du build ; `registerType:
 
 ### 10. Déploiement : GitHub Actions → GitHub Pages
 
-Workflow sur `push` vers `main` : `npm ci`, `npm test`, `npm run build`, puis publication du dossier `dist` via les actions officielles `upload-pages-artifact` et `deploy-pages`. Le dépôt s'appelle `voc_trainer` : Vite est configuré avec `base: "/voc_trainer/"` et l'application est servie sur `https://<compte>.github.io/voc_trainer/`. Le runner utilise Node 22, indépendamment du poste local.
+Workflow sur `push` vers `main` : `npm ci`, `npm test`, `npm run build`, puis publication du dossier `dist` via les actions officielles `upload-pages-artifact` et `deploy-pages`. Le dépôt s'appelle `voc_trainer` : Vite est configuré avec `base: "/voc_trainer/"` et l'application est servie sur `https://bhenriet.github.io/voc_trainer/`. Le runner utilise Node 22, indépendamment du poste local.
 
 ### 11. Version de Node
 

@@ -2,7 +2,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Servi par GitHub Pages sous https://<compte>.github.io/voc_trainer/
+// Servi par GitHub Pages sous https://bhenriet.github.io/voc_trainer/
 const base = '/voc_trainer/'
 
 // https://vite.dev/config/
