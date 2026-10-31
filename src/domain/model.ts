@@ -7,10 +7,18 @@ export const DIRECTIONS: readonly Direction[] = ['ab', 'ba']
 
 export type Level = 1 | 2 | 3 | 4 | 5
 
-/** Progression d'un mot dans un sens. `null` = jamais révisé (« Nouveau »). */
+/** Note donnée à une réponse (échelle FSRS). Une réponse fausse vaut `again`, une juste `good`. */
+export type Grade = 'again' | 'hard' | 'good' | 'easy'
+
+/** Progression d'un mot dans un sens (état FSRS). `null` = jamais révisé (« Nouveau »). */
 export interface Progress {
-  level: Level
+  /** Stabilité en jours : délai au bout duquel la probabilité de rappel tombe à 90 %. */
+  stability: number
+  /** Difficulté de 1 (facile) à 10 (difficile). */
+  difficulty: number
   reviewed: Day
+  /** Dernière réponse fausse, pas encore réussie : à revoir le jour même. */
+  relearning: boolean
 }
 
 export interface Word {

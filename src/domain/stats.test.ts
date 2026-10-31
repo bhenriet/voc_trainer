@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import type { Word } from './model'
+import type { Progress, Word } from './model'
 import { directionStats } from './stats'
 
+const progress = (stability: number, reviewed: string, relearning = false): Progress => ({
+  stability,
+  difficulty: 5,
+  reviewed,
+  relearning,
+})
+
 const words: Word[] = [
-  { id: 1, a: 'maison', b: 'house', ab: { level: 3, reviewed: '2026-10-20' }, ba: null },
-  { id: 2, a: 'chien', b: 'dog', ab: { level: 3, reviewed: '2026-10-28' }, ba: { level: 1, reviewed: '2026-10-29' } },
-  { id: 3, a: 'chat', b: 'cat', ab: null, ba: { level: 5, reviewed: '2026-10-29' } },
+  { id: 1, a: 'maison', b: 'house', ab: progress(7, '2026-10-20'), ba: null },
+  { id: 2, a: 'chien', b: 'dog', ab: progress(7, '2026-10-28'), ba: progress(1, '2026-10-29', true) },
+  { id: 3, a: 'chat', b: 'cat', ab: null, ba: progress(75, '2026-10-29') },
 ]
 
 describe('directionStats', () => {

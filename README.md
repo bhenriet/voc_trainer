@@ -22,10 +22,18 @@ Elles sont ajoutées par l'export et relues à l'import. Leur nom dérive des de
 
 | Colonne | Contenu |
 |---|---|
-| `maitrise_fr_en`, `maitrise_en_fr` | niveau de maîtrise de 1 à 5 dans ce sens, vide si jamais révisé |
+| `maitrise_fr_en`, `maitrise_en_fr` | état de mémorisation dans ce sens, au format `S:<stabilité>\|D:<difficulté>` (ex. `S:12.4\|D:5.3`), suivi de `\|R:1` si le mot est à retravailler ; vide si jamais révisé |
 | `revu_fr_en`, `revu_en_fr` | date de dernière révision `AAAA-MM-JJ` |
 
-Niveaux : Nouveau (jamais révisé), 1 En apprentissage, 2 Familier, 3 Bien connu, 4 Très bien connu, 5 Maîtrisé. Une réponse juste fait monter d'un niveau, une réponse fausse ramène au niveau 1. Un mot revient en révision après 0, 1, 3, 7 ou 14 jours selon son niveau.
+Ces valeurs ne sont pas faites pour être modifiées à la main. Un ancien fichier dont `maitrise_*` contient un entier de 1 à 5 reste importable : le niveau est converti.
+
+### Planification des révisions (FSRS)
+
+Les révisions sont planifiées avec l'algorithme [FSRS](https://github.com/open-spaced-repetition/ts-fsrs) (bibliothèque `ts-fsrs`), avec une rétention cible de 90 %. Pour chaque mot et chaque sens, l'application suit une **stabilité** (en jours : le délai au bout duquel on a 90 % de chances de se souvenir du mot) et une **difficulté**. Une réponse juste est notée *Good*, une réponse fausse *Again*. Un mot réussi revient après un intervalle égal à sa stabilité (au moins 1 jour).
+
+Une carte ratée est marquée « à retravailler » : elle reste à revoir **le jour même**, utile la veille d'un contrôle. Pendant la session, elle est reposée en fin de session (« Réessai ») jusqu'à être réussie ; si vous arrêtez avant, elle est proposée dans la prochaine session du jour. Seule la première réponse à une carte compte pour FSRS et pour le bilan.
+
+Niveaux affichés, déduits de la stabilité : Nouveau (jamais révisé), 1 En apprentissage (moins de 2 jours), 2 Familier (moins de 7), 3 Bien connu (moins de 21), 4 Très bien connu (moins de 60), 5 Maîtrisé (60 jours ou plus).
 
 Les autres colonnes sont ignorées et ne figurent pas dans l'export.
 

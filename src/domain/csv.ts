@@ -1,5 +1,6 @@
 import Papa from 'papaparse'
 import { isValidDay, type Day } from './dates'
+import { fromLegacyLevel } from './mastery'
 import type { Direction, Languages, Level, NewWord, Progress, Word } from './model'
 
 export type Delimiter = ';' | ','
@@ -33,11 +34,29 @@ export function progressColumns(languages: Languages) {
 
 const normalizeHeader = (value: string) => value.trim().toLowerCase()
 
-function readProgress(level: string, reviewed: string): { progress: Progress | null; corrected: boolean } {
-  if (level === '' && reviewed === '') return { progress: null, corrected: false }
-  const isLevel = /^[1-5]$/.test(level)
-  if (!isLevel || !isValidDay(reviewed)) return { progress: null, corrected: true }
-  return { progress: { level: Number(level) as Level, reviewed: reviewed as Day }, corrected: false }
+const FSRS_CELL = /^S:(\d+(?:\.\d+)?)\|D:(\d+(?:\.\d+)?)(\|R:1)?$/
+
+/** Lit la cellule `maitrise_*` (format `S:<stabilité>|D:<difficulté>[|R:1]` ou ancien niveau 1 à 5) et la date `revu_*`. */
+function readProgress(mastery: string, reviewed: string): { progress: Progress | null; corrected: boolean } {
+  if (mastery === '' && reviewed === '') return { progress: null, corrected: false }
+  if (!isValidDay(reviewed)) return { progress: null, corrected: true }
+  const day = reviewed as Day
+
+  if (/^[1-5]$/.test(mastery)) return { progress: fromLegacyLevel(Number(mastery) as Level, day), corrected: false }
+
+  const match = FSRS_CELL.exec(mastery)
+  if (!match) return { progress: null, corrected: true }
+  const stability = Number(match[1])
+  const difficulty = Number(match[2])
+  if (stability <= 0 || difficulty < 1 || difficulty > 10) return { progress: null, corrected: true }
+  return { progress: { stability, difficulty, reviewed: day, relearning: match[3] !== undefined }, corrected: false }
+}
+
+/** Cellule `maitrise_*` d'un sens : 4 chiffres significatifs suffisent, le point est toujours le séparateur décimal. */
+function writeMastery(progress: Progress | null): string {
+  if (!progress) return ''
+  const number = (value: number) => String(Number(value.toPrecision(4)))
+  return `S:${number(progress.stability)}|D:${number(progress.difficulty)}${progress.relearning ? '|R:1' : ''}`
 }
 
 /** Lit un CSV de vocabulaire. N'a aucun effet de bord : l'appelant décide d'enregistrer. */
@@ -110,8 +129,8 @@ export function serialize(languages: Languages, words: readonly (Word | NewWord)
   const rows = words.map((w) => [
     w.a,
     w.b,
-    w.ab ? String(w.ab.level) : '',
-    w.ba ? String(w.ba.level) : '',
+    writeMastery(w.ab),
+    writeMastery(w.ba),
     w.ab?.reviewed ?? '',
     w.ba?.reviewed ?? '',
   ])

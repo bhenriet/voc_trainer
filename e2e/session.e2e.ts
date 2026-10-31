@@ -52,8 +52,10 @@ test.describe('configuration', () => {
       expect(seen.has(String(word))).toBe(false)
       seen.add(String(word))
       await answer(page, 'x')
-      await page.getByRole('button', { name: i === 5 ? 'Voir le bilan' : 'Suivant' }).click()
+      // Les réponses fausses remettent les cartes en file de réessai : on ne va pas au bout.
+      if (i < 5) await page.getByRole('button', { name: 'Suivant' }).click()
     }
+    await page.getByRole('button', { name: 'Arrêter' }).click()
     await expect(page.getByRole('heading', { name: 'Bilan' })).toBeVisible()
   })
 })
@@ -113,7 +115,8 @@ test.describe('progression et bilan', () => {
     await expect(page.getByText('1 juste')).toBeVisible()
     await expect(page.getByText('0 fausse')).toBeVisible()
     await page.getByRole('button', { name: 'Accueil' }).click()
-    expect(await progressRow(page, 'En apprentissage')).toEqual(['1', '0'])
+    // Comme une première réponse juste : stabilité initiale de Good, niveau 2.
+    expect(await progressRow(page, 'Familier')).toEqual(['1', '0'])
   })
 
   test('bilan : compteurs et liste des cartes ratées', async ({ page }) => {
@@ -123,13 +126,72 @@ test.describe('progression et bilan', () => {
     for (let i = 1; i <= 3; i++) {
       const prompt = (await page.locator('.prompt').textContent())!.trim()
       await answer(page, answers[prompt])
-      await page.getByRole('button', { name: i === 3 ? 'Voir le bilan' : 'Suivant' }).click()
+      // La carte ratée est reposée en réessai : il y a donc toujours une carte après la 3e.
+      await page.getByRole('button', { name: 'Suivant' }).click()
     }
+    await expect(page.getByText('Réessai')).toBeVisible()
+    await answer(page, 'dog')
+    await page.getByRole('button', { name: 'Voir le bilan' }).click()
     await expect(page.getByText('2 justes')).toBeVisible()
     await expect(page.getByText('1 fausse')).toBeVisible()
     const missed = page.getByRole('row').filter({ hasText: 'chien' })
     await expect(missed).toContainText('dog')
     await expect(missed).toContainText('votre réponse : cat')
+  })
+
+  test('carte ratée : reposée en réessai jusqu’à être réussie, comptée fausse au bilan', async ({ page }) => {
+    await importFresh(page, { csv: 'fr;en\nmaison;house' })
+    await startSession(page, 'fr → en', 1)
+    await expect(page.getByText('1 / 1')).toBeVisible()
+    await answer(page, 'home')
+    await expect(page.getByText('Faux.')).toBeVisible()
+    await page.getByRole('button', { name: 'Suivant' }).click()
+
+    // Premier réessai raté : la carte revient encore.
+    await expect(page.getByText('Réessai')).toBeVisible()
+    await expect(page.locator('.prompt')).toHaveText('maison')
+    await answer(page, 'hose')
+    await expect(page.getByText('Faux.')).toBeVisible()
+    await page.getByRole('button', { name: 'Suivant' }).click()
+
+    await expect(page.getByText('Réessai')).toBeVisible()
+    await answer(page, 'house')
+    await expect(page.getByText('Juste !')).toBeVisible()
+    await page.getByRole('button', { name: 'Voir le bilan' }).click()
+
+    await expect(page.getByText('0 juste')).toBeVisible()
+    await expect(page.getByText('1 fausse')).toBeVisible()
+    await expect(page.getByRole('row').filter({ hasText: 'maison' })).toContainText('votre réponse : home')
+  })
+
+  test('« j’avais juste » sur la première réponse : pas de réessai', async ({ page }) => {
+    await importFresh(page, { csv: 'fr;en\nmaison;house' })
+    await startSession(page, 'fr → en', 1)
+    await answer(page, 'home')
+    await page.getByRole('button', { name: 'J’avais juste' }).click()
+    await expect(page.getByRole('button', { name: 'Voir le bilan' })).toBeVisible()
+  })
+
+  test('session interrompue : la carte ratée reste à revoir le jour même, pas la réussie', async ({ page }) => {
+    await importFresh(page, { csv: 'fr;en\nmaison;house\nchien;dog' })
+    await startSession(page, 'fr → en', 2)
+    const answers: Record<string, string> = { maison: 'house', chien: 'x' }
+    for (let i = 0; i < 2; i++) {
+      const prompt = (await page.locator('.prompt').textContent())!.trim()
+      await answer(page, answers[prompt])
+      await page.getByRole('button', { name: 'Suivant' }).click()
+    }
+    await expect(page.locator('.prompt')).toHaveText('chien')
+    await page.getByRole('button', { name: 'Arrêter' }).click()
+    await page.getByRole('button', { name: 'Accueil' }).click()
+
+    // Une nouvelle session le même jour ne propose que la carte ratée.
+    await page.getByRole('button', { name: 'Réviser' }).click()
+    await page.getByLabel('fr → en').check()
+    await page.getByLabel('Nombre de cartes').fill('5')
+    await page.getByRole('button', { name: 'Commencer' }).click()
+    await expect(page.getByText('1 / 1')).toBeVisible()
+    await expect(page.locator('.prompt')).toHaveText('chien')
   })
 
   test('progression conservée après un rechargement en cours de session', async ({ page }) => {
@@ -139,7 +201,7 @@ test.describe('progression et bilan', () => {
     await answer(page, prompt === 'maison' ? 'house' : 'dog')
     await expect(page.getByText('Juste !')).toBeVisible()
     await page.reload()
-    expect(await progressRow(page, 'En apprentissage')).toEqual(['1', '0'])
+    expect(await progressRow(page, 'Familier')).toEqual(['1', '0'])
     expect(await progressRow(page, 'Nouveau')).toEqual(['1', '2'])
     await expect(page.getByText('Des progrès ne sont pas encore sauvegardés dans un fichier.', { exact: false })).toBeVisible()
   })

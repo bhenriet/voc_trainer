@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parse } from './csv'
+import { fromLegacyLevel } from './mastery'
 
 // Les fichiers de samples/ servent aux vérifications manuelles de l'import : on s'assure ici
 // qu'ils produisent bien le cas qu'ils illustrent.
@@ -12,9 +13,18 @@ describe('fichiers d’exemple', () => {
     expect(result.ok && result.summary.words.length).toBe(10)
   })
 
-  it('fr-en-progression.csv (avec BOM)', () => {
+  it('fr-en-progression.csv (ancien format de maîtrise, avec BOM)', () => {
     const result = parse(sample('fr-en-progression.csv'))
-    expect(result.ok && result.summary.words[0].ab).toEqual({ level: 3, reviewed: '2026-10-28' })
+    expect(result.ok && result.summary.words[0].ab).toEqual(fromLegacyLevel(3, '2026-10-28'))
+  })
+
+  it('fr-en-fsrs.csv (format FSRS, dont un sens à retravailler)', () => {
+    const result = parse(sample('fr-en-fsrs.csv'))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.summary.correctedValues).toBe(0)
+    expect(result.summary.words[0].ab).toMatchObject({ stability: 12.4, difficulty: 5.3, reviewed: '2026-10-28', relearning: false })
+    expect(result.summary.words.some((w) => w.ab?.relearning || w.ba?.relearning)).toBe(true)
   })
 
   it('fr-en-virgule.csv', () => {

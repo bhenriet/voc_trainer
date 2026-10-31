@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Direction, Languages, NewWord, Progress, Word } from '../domain/model'
+import { fromLegacyLevel } from '../domain/mastery'
+import type { Direction, Languages, Level, NewWord, Progress, Word } from '../domain/model'
 
 const META_KEY = 'vocabulary'
 
@@ -26,7 +27,31 @@ export type VocabularyDb = Dexie & {
 export function openDb(name = 'voc-trainer'): VocabularyDb {
   const db = new Dexie(name) as VocabularyDb
   db.version(1).stores({ meta: 'key', words: '++id' })
+  // v2 : la progression passe du niveau Leitner à l'état FSRS (même schéma d'index).
+  db.version(2)
+    .stores({ meta: 'key', words: '++id' })
+    .upgrade((tx) =>
+      tx
+        .table('words')
+        .toCollection()
+        .modify((word) => {
+          word.ab = migrateProgress(word.ab)
+          word.ba = migrateProgress(word.ba)
+        }),
+    )
   return db
+}
+
+interface LegacyProgress {
+  level: Level
+  reviewed: string
+}
+
+/** Convertit une progression `{ level, reviewed }` de l'ancienne version ; laisse intacte une progression déjà FSRS. */
+export function migrateProgress(value: LegacyProgress | Progress | null | undefined): Progress | null {
+  if (!value) return null
+  if ('level' in value) return fromLegacyLevel(value.level, value.reviewed)
+  return value
 }
 
 export async function loadVocabulary(db: VocabularyDb): Promise<Vocabulary | null> {

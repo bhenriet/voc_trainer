@@ -21,9 +21,16 @@ function word(ab: Progress | null, ba: Progress | null = null): Word {
   return { id, a: `a${id}`, b: `b${id}`, ab, ba }
 }
 
-/** Progression de niveau 1 révisée il y a `days` jours : en retard de `days` jours. */
-const overdue = (days: number): Progress => ({ level: 1, reviewed: addDaysBack(days) })
-const notYetDue: Progress = { level: 5, reviewed: TODAY }
+const progress = (stability: number, reviewed: string, relearning = false): Progress => ({
+  stability,
+  difficulty: 5,
+  reviewed,
+  relearning,
+})
+
+/** Stabilité 1 jour révisée il y a `days` + 2 jours : échue, et d'autant moins mémorisée que `days` est grand. */
+const overdue = (days: number): Progress => progress(1, addDaysBack(days + 2))
+const notYetDue: Progress = progress(60, TODAY)
 
 function addDaysBack(days: number): string {
   const d = new Date(Date.UTC(2026, 9, 29 - days))
@@ -41,7 +48,7 @@ describe('selectCards', () => {
     expect(cards.filter((c) => fresh.some((w) => w.id === c.wordId))).toHaveLength(5)
   })
 
-  it('plus de cartes à revoir que demandé : les plus en retard', () => {
+  it('plus de cartes à revoir que demandé : les moins mémorisées', () => {
     const words = Array.from({ length: 50 }, (_, i) => word(overdue(i)))
     const cards = selectCards(words, 10, 'ab', TODAY, seeded(2))
     const retards = cards.map((c) => words.findIndex((w) => w.id === c.wordId)).sort((x, y) => y - x)
@@ -54,7 +61,7 @@ describe('selectCards', () => {
   })
 
   it('n’inclut jamais une carte pas encore échue', () => {
-    const words = [word(notYetDue), word({ level: 3, reviewed: '2026-10-28' })]
+    const words = [word(notYetDue), word(progress(3, '2026-10-28'))]
     expect(selectCards(words, 10, 'ab', TODAY, seeded(4))).toEqual([])
   })
 
@@ -68,6 +75,15 @@ describe('selectCards', () => {
     const first = selectCards(words, 20, 'ab', TODAY, seeded(6)).map((c) => c.wordId)
     const second = selectCards(words, 20, 'ab', TODAY, seeded(7)).map((c) => c.wordId)
     expect(first).not.toEqual(second)
+  })
+})
+
+describe('cartes à retravailler', () => {
+  it('passent avant les cartes échues, même révisées aujourd’hui', () => {
+    const failed = word(progress(1, TODAY, true))
+    const words = [...Array.from({ length: 20 }, (_, i) => word(overdue(i))), failed]
+    const cards = selectCards(words, 3, 'ab', TODAY, seeded(10))
+    expect(cards.some((c) => c.wordId === failed.id)).toBe(true)
   })
 })
 
@@ -98,10 +114,10 @@ describe('selectCards en mode mélangé', () => {
 
 describe('nextDueDay', () => {
   it('donne la prochaine échéance dans le sens choisi', () => {
-    const words = [word({ level: 5, reviewed: TODAY }, { level: 2, reviewed: TODAY }), word({ level: 4, reviewed: TODAY })]
-    expect(nextDueDay(words, 'ab')).toBe('2026-11-05')
-    expect(nextDueDay(words, 'ba')).toBe('2026-10-30')
-    expect(nextDueDay(words, 'mixed')).toBe('2026-10-30')
+    const words = [word(progress(60, TODAY), progress(3, TODAY)), word(progress(21, TODAY))]
+    expect(nextDueDay(words, 'ab')).toBe('2026-11-19')
+    expect(nextDueDay(words, 'ba')).toBe('2026-11-01')
+    expect(nextDueDay(words, 'mixed')).toBe('2026-11-01')
   })
 
   it('null si aucun mot n’a encore été révisé', () => {

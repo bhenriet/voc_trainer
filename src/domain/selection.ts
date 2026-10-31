@@ -1,5 +1,5 @@
 import type { Day } from './dates'
-import { dueDay, isDue, overdueDays } from './mastery'
+import { dueDay, isDue, retrievability } from './mastery'
 import { DIRECTIONS, type Card, type Direction, type Word } from './model'
 
 /** Sens choisi pour une session. */
@@ -22,12 +22,12 @@ function directionsOf(mode: StudyMode): readonly Direction[] {
 }
 
 /**
- * Choisit au plus `count` cartes : d'abord celles à revoir (les plus en retard en premier),
+ * Choisit au plus `count` cartes : d'abord celles à revoir (les moins susceptibles d'être retenues en premier),
  * puis des Nouvelles. Les cartes pas encore échues sont exclues. En mode mélangé,
  * un mot n'apparaît que dans un seul sens. L'ordre renvoyé est aléatoire.
  */
 export function selectCards(words: readonly Word[], count: number, mode: StudyMode, day: Day, random: Random): Card[] {
-  const due: { card: Card; overdue: number }[] = []
+  const due: { card: Card; recall: number }[] = []
   const fresh: Card[] = []
 
   for (const word of words) {
@@ -35,14 +35,14 @@ export function selectCards(words: readonly Word[], count: number, mode: StudyMo
       const progress = word[direction]
       const card = { wordId: word.id, direction }
       if (progress === null) fresh.push(card)
-      else if (isDue(progress, day)) due.push({ card, overdue: overdueDays(progress, day) })
+      else if (isDue(progress, day)) due.push({ card, recall: retrievability(progress, day) })
     }
   }
 
-  // Mélange avant le tri (stable) : les égalités de retard sont départagées au hasard.
+  // Mélange avant le tri (stable) : les égalités sont départagées au hasard.
   const ordered = [
     ...shuffle(due, random)
-      .sort((x, y) => y.overdue - x.overdue)
+      .sort((x, y) => x.recall - y.recall)
       .map((d) => d.card),
     ...shuffle(fresh, random),
   ]

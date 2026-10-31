@@ -1,5 +1,5 @@
 import type { Day } from './dates'
-import { isDue } from './mastery'
+import { isDue, levelOf } from './mastery'
 import type { Direction, Level, Word } from './model'
 
 export interface DirectionStats {
@@ -18,7 +18,7 @@ export function directionStats(words: readonly Word[], direction: Direction, day
       stats.fresh++
       continue
     }
-    stats.levels[progress.level]++
+    stats.levels[levelOf(progress.stability)]++
     if (isDue(progress, day)) stats.due++
   }
   return stats

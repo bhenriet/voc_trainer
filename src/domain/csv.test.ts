@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { exportFileName, parse, serialize, type ImportSummary, type ParseResult } from './csv'
+import { fromLegacyLevel, levelOf } from './mastery'
+import type { Progress } from './model'
+
+const progress = (stability: number, difficulty: number, reviewed: string, relearning = false): Progress => ({
+  stability,
+  difficulty,
+  reviewed,
+  relearning,
+})
 
 function ok(result: ParseResult): ImportSummary {
   if (!result.ok) throw new Error(`import refusé : ${result.error}`)
@@ -23,19 +32,36 @@ describe('parse : format', () => {
 
   it('fichier avec progression', () => {
     const summary = ok(
-      parse('fr;en;maitrise_fr_en;maitrise_en_fr;revu_fr_en;revu_en_fr\nmaison;house;3;1;2026-10-28;2026-10-20'),
+      parse(
+        'fr;en;maitrise_fr_en;maitrise_en_fr;revu_fr_en;revu_en_fr\nmaison;house;S:12.4|D:5.3;S:1.5|D:6.1;2026-10-28;2026-10-20',
+      ),
     )
     expect(summary.words[0]).toEqual({
       a: 'maison',
       b: 'house',
-      ab: { level: 3, reviewed: '2026-10-28' },
-      ba: { level: 1, reviewed: '2026-10-20' },
+      ab: progress(12.4, 5.3, '2026-10-28'),
+      ba: progress(1.5, 6.1, '2026-10-20'),
     })
+  })
+
+  it('sens à retravailler (suffixe |R:1)', () => {
+    const summary = ok(parse('fr;en;maitrise_fr_en;revu_fr_en\nmaison;house;S:0.8|D:6.1|R:1;2026-10-28'))
+    expect(summary.words[0].ab).toEqual(progress(0.8, 6.1, '2026-10-28', true))
+  })
+
+  it('ancien format : entier de 1 à 5 converti, niveau et date conservés', () => {
+    const summary = ok(
+      parse('fr;en;maitrise_fr_en;maitrise_en_fr;revu_fr_en;revu_en_fr\nmaison;house;3;1;2026-10-28;2026-10-20'),
+    )
+    expect(summary.words[0].ab).toEqual(fromLegacyLevel(3, '2026-10-28'))
+    expect(summary.words[0].ba).toEqual(fromLegacyLevel(1, '2026-10-20'))
+    expect(levelOf(summary.words[0].ab!.stability)).toBe(3)
+    expect(summary.correctedValues).toBe(0)
   })
 
   it('colonnes de progression repérées par leur nom, dans n’importe quel ordre', () => {
     const summary = ok(parse('fr;en;revu_en_fr;Maitrise_EN_FR\nmaison;house;2026-10-20;2'))
-    expect(summary.words[0].ba).toEqual({ level: 2, reviewed: '2026-10-20' })
+    expect(summary.words[0].ba).toEqual(fromLegacyLevel(2, '2026-10-20'))
     expect(summary.words[0].ab).toBeNull()
   })
 
@@ -97,12 +123,16 @@ describe('parse : validation', () => {
           'chien;dog;3;x;2026-10-28;2026-10-20', // niveau non numérique (en→fr)
           'chat;cat;3;;28/10/2026;', // date mal formée (fr→en)
           'lapin;rabbit;2;;;', // niveau sans date (fr→en)
+          'ours;bear;S:0|D:5;S:3|D:11;2026-10-28;2026-10-28', // stabilité nulle, difficulté hors limites
+          'loup;wolf;S:abc|D:5;S:2|D:5|R:2;2026-10-28;2026-10-28', // valeurs mal formées
         ].join('\n'),
       ),
     )
-    expect(summary.correctedValues).toBe(4)
-    expect(summary.words[0]).toMatchObject({ ab: null, ba: { level: 2, reviewed: '2026-10-20' } })
-    expect(summary.words[1]).toMatchObject({ ab: { level: 3, reviewed: '2026-10-28' }, ba: null })
+    expect(summary.correctedValues).toBe(8)
+    expect(summary.words[0]).toMatchObject({ ab: null, ba: fromLegacyLevel(2, '2026-10-20') })
+    expect(summary.words[1]).toMatchObject({ ab: fromLegacyLevel(3, '2026-10-28'), ba: null })
+    expect(summary.words[4]).toMatchObject({ ab: null, ba: null })
+    expect(summary.words[5]).toMatchObject({ ab: null, ba: null })
     expect(summary.words[2]).toMatchObject({ ab: null, ba: null })
     expect(summary.words[3]).toMatchObject({ ab: null, ba: null })
   })
@@ -110,7 +140,7 @@ describe('parse : validation', () => {
   it('signale les colonnes non reconnues', () => {
     const summary = ok(parse('fr;en;categorie;maitrise_fr_en;revu_fr_en\nmaison;house;habitat;2;2026-10-28'))
     expect(summary.ignoredColumns).toEqual(['categorie'])
-    expect(summary.words[0].ab).toEqual({ level: 2, reviewed: '2026-10-28' })
+    expect(summary.words[0].ab).toEqual(fromLegacyLevel(2, '2026-10-28'))
   })
 })
 
@@ -118,19 +148,26 @@ describe('serialize', () => {
   const languages = { a: 'fr', b: 'en' }
 
   it('produit l’en-tête complet, le BOM et des cellules vides pour un sens Nouveau', () => {
-    const csv = serialize(languages, [{ a: 'maison', b: 'house', ab: { level: 3, reviewed: '2026-10-28' }, ba: null }])
+    const csv = serialize(languages, [{ a: 'maison', b: 'house', ab: progress(12.4, 5.3, '2026-10-28'), ba: null }])
     expect(csv.startsWith('﻿')).toBe(true)
     expect(csv.slice(1).split('\r\n')).toEqual([
       'fr;en;maitrise_fr_en;maitrise_en_fr;revu_fr_en;revu_en_fr',
-      'maison;house;3;;2026-10-28;',
+      'maison;house;S:12.4|D:5.3;;2026-10-28;',
       '',
     ])
   })
 
+  it('écrit 4 chiffres significatifs et le suffixe |R:1 des sens à retravailler', () => {
+    const csv = serialize(languages, [
+      { a: 'maison', b: 'house', ab: progress(12.3456789, 5.123456, '2026-10-28'), ba: progress(0.8, 6.1, '2026-10-28', true) },
+    ])
+    expect(csv.split('\r\n')[1]).toBe('maison;house;S:12.35|D:5.123;S:0.8|D:6.1|R:1;2026-10-28;2026-10-28')
+  })
+
   it('aller-retour serialize → parse sans perte', () => {
     const words = [
-      { a: 'maison / foyer', b: 'house', ab: { level: 3 as const, reviewed: '2026-10-28' }, ba: { level: 1 as const, reviewed: '2026-10-20' } },
-      { a: 'garder (un objet; un secret)', b: 'keep (an object; a "secret")', ab: null, ba: { level: 5 as const, reviewed: '2026-09-01' } },
+      { a: 'maison / foyer', b: 'house', ab: progress(12.4, 5.3, '2026-10-28'), ba: progress(0.8, 6.1, '2026-10-20', true) },
+      { a: 'garder (un objet; un secret)', b: 'keep (an object; a "secret")', ab: null, ba: progress(75, 2.5, '2026-09-01') },
       { a: 'été', b: 'summer', ab: null, ba: null },
     ]
     const summary = ok(parse(serialize(languages, words)))

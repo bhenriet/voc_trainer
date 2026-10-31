@@ -20,7 +20,10 @@ test('aucun défilement horizontal sur chaque écran', async ({ page }) => {
   await expectNoHorizontalScroll(page)
   await answer(page, 'une réponse fausse assez longue pour tester le retour à la ligne')
   await expectNoHorizontalScroll(page)
-  await page.getByRole('button', { name: 'Voir le bilan' }).click()
+  await page.getByRole('button', { name: 'Suivant' }).click()
+  await expectNoHorizontalScroll(page)
+  await page.getByRole('button', { name: 'Arrêter' }).click()
+  await expect(page.getByRole('heading', { name: 'Bilan' })).toBeVisible()
   await expectNoHorizontalScroll(page)
 })
 

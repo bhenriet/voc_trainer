@@ -28,7 +28,8 @@
   },
   "dependencies": {
     "dexie": "^4.4.7",
-    "papaparse": "^5.7.0"
+    "papaparse": "^5.7.0",
+    "ts-fsrs": "^5.4.2"
   },
   "engines": {
     "node": ">=20.19"
