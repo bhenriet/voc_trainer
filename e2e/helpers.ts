@@ -10,13 +10,22 @@ export function localDay(offsetDays = 0): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** Ouvre l'écran d'import depuis l'accueil, qu'il y ait déjà un vocabulaire ou non. */
-export async function openImport(page: Page) {
-  const first = page.getByRole('button', { name: 'Importer un fichier CSV' })
-  const other = page.getByRole('button', { name: 'Importer un autre fichier' })
-  await expect(first.or(other)).toBeVisible()
-  if (await first.isVisible()) await first.click()
-  else await other.click()
+/** Ouvre l'écran d'import (« Étudier un jeu de cartes » ou « Ajouter des cartes de vocabulaire ») depuis l'accueil. */
+export async function openImport(page: Page, mode: 'study' | 'append' = 'study') {
+  const name = mode === 'study' ? 'Étudier un jeu de cartes' : 'Ajouter des cartes de vocabulaire'
+  await page.getByRole('button', { name, exact: true }).click()
+}
+
+/** Valide la liste lue : « Importer » (nouveau jeu), « Ajouter » ou « Remplacer ». */
+export async function confirmImport(page: Page, label: 'Importer' | 'Ajouter' | 'Remplacer' = 'Importer') {
+  await page.getByRole('button', { name: label, exact: true }).click()
+}
+
+/** Passe à la source « coller » et colle le texte (tabulations comprises). */
+export async function pasteList(page: Page, text: string) {
+  await page.getByLabel('Coller depuis un tableur').check()
+  await page.getByLabel('Liste collée').fill(text)
+  await page.getByRole('button', { name: 'Lire', exact: true }).click()
 }
 
 /** Choisit un fichier : chemin d'un exemple de samples/ ou contenu CSV en ligne. */
@@ -31,6 +40,7 @@ export async function importFresh(page: Page, file: { sample: string } | { csv: 
   await page.goto('./')
   await openImport(page)
   await chooseFile(page, file)
+  await confirmImport(page)
   await expect(page.getByText('Import terminé.')).toBeVisible()
   await page.getByRole('button', { name: 'Continuer' }).click()
   await expect(page.getByRole('button', { name: 'Réviser' })).toBeVisible()

@@ -77,6 +77,14 @@ export async function replaceAll(db: VocabularyDb, languages: Languages, words: 
   })
 }
 
+/** Ajoute des mots au jeu existant (niveau Nouveau) sans toucher aux mots, à la progression ni aux langues. */
+export async function appendWords(db: VocabularyDb, words: NewWord[]) {
+  await db.transaction('rw', db.meta, db.words, async () => {
+    await db.words.bulkAdd(words as Word[])
+    await db.meta.update(META_KEY, { unsavedChanges: true })
+  })
+}
+
 /** Enregistre la progression d'un mot dans un sens, dès la réponse validée. */
 export async function saveProgress(db: VocabularyDb, wordId: number, direction: Direction, progress: Progress) {
   await db.transaction('rw', db.meta, db.words, async () => {

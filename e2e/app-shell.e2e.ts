@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { answer, expectNoHorizontalScroll, importFresh, openImport, startSession } from './helpers'
+import { answer, expectNoHorizontalScroll, confirmImport, importFresh, openImport, startSession } from './helpers'
 
 test('aucun défilement horizontal sur chaque écran', async ({ page }) => {
   await page.goto('./')
@@ -29,7 +29,7 @@ test('aucun défilement horizontal sur chaque écran', async ({ page }) => {
 
 test('zones tactiles d’au moins 44 px de haut pour les boutons principaux', async ({ page }) => {
   await importFresh(page, { sample: 'fr-en-minimal.csv' })
-  for (const name of ['Réviser', 'Exporter en CSV', 'Importer un autre fichier']) {
+  for (const name of ['Réviser', 'Exporter en CSV', 'Étudier un jeu de cartes', 'Ajouter des cartes de vocabulaire']) {
     const box = await page.getByRole('button', { name }).boundingBox()
     expect(box!.height).toBeGreaterThanOrEqual(44)
   }
@@ -96,6 +96,7 @@ test.describe('PWA', () => {
       mimeType: 'text/csv',
       buffer: Buffer.from('fr;en\nmaison;house'),
     })
+    await confirmImport(page)
     await page.getByRole('button', { name: 'Continuer' }).click()
     await startSession(page, 'fr → en', 1)
     await answer(page, 'house')

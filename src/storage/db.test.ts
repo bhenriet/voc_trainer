@@ -3,7 +3,7 @@ import Dexie from 'dexie'
 import { afterEach, describe, expect, it } from 'vitest'
 import { fromLegacyLevel } from '../domain/mastery'
 import type { Progress } from '../domain/model'
-import { loadVocabulary, markExported, openDb, replaceAll, saveProgress, type VocabularyDb } from './db'
+import { appendWords, loadVocabulary, markExported, openDb, replaceAll, saveProgress, type VocabularyDb } from './db'
 
 const languages = { a: 'fr', b: 'en' }
 let db: VocabularyDb
@@ -75,6 +75,41 @@ describe('stockage', () => {
     await saveProgress(db, word.id, 'ab', progress('2026-10-29'))
     await replaceAll(db, languages, [{ a: 'chat', b: 'cat', ab: null, ba: null }])
     expect((await loadVocabulary(db))!.meta.unsavedChanges).toBe(false)
+  })
+})
+
+describe('ajout de mots', () => {
+  it('ajoute à la suite sans toucher aux mots existants, à leur progression ni aux langues', async () => {
+    freshDb()
+    await replaceAll(db, languages, [{ a: 'maison', b: 'house', ab: progress('2026-10-28'), ba: null }])
+
+    await appendWords(db, [
+      { a: 'chien', b: 'dog', ab: null, ba: null },
+      { a: 'chat', b: 'cat', ab: null, ba: null },
+    ])
+
+    const { meta, words } = (await loadVocabulary(db))!
+    expect(meta.languages).toEqual(languages)
+    expect(words).toHaveLength(3)
+    expect(words[0]).toMatchObject({ a: 'maison', ab: progress('2026-10-28') })
+    expect(words.slice(1)).toMatchObject([
+      { a: 'chien', ab: null, ba: null },
+      { a: 'chat', ab: null, ba: null },
+    ])
+  })
+
+  it('ne déduplique pas', async () => {
+    freshDb()
+    await replaceAll(db, languages, [{ a: 'maison', b: 'house', ab: null, ba: null }])
+    await appendWords(db, [{ a: 'maison', b: 'house', ab: null, ba: null }])
+    expect((await loadVocabulary(db))!.words).toHaveLength(2)
+  })
+
+  it('invite à exporter', async () => {
+    freshDb()
+    await replaceAll(db, languages, [{ a: 'maison', b: 'house', ab: null, ba: null }])
+    await appendWords(db, [{ a: 'chien', b: 'dog', ab: null, ba: null }])
+    expect((await loadVocabulary(db))!.meta.unsavedChanges).toBe(true)
   })
 })
 

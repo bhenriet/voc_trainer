@@ -128,7 +128,8 @@ button:disabled {
 
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
@@ -146,7 +147,8 @@ select:focus-visible {
 
 input[type='text'],
 input[type='number'],
-select {
+select,
+textarea {
   font: inherit;
   /* 16 px minimum : évite le zoom automatique de Safari iOS au focus. */
   font-size: max(1rem, 16px);
@@ -157,6 +159,11 @@ select {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
+}
+
+textarea {
+  min-height: 9rem;
+  resize: vertical;
 }
 
 label {

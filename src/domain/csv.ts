@@ -3,7 +3,7 @@ import { isValidDay, type Day } from './dates'
 import { fromLegacyLevel } from './mastery'
 import type { Direction, Languages, Level, NewWord, Progress, Word } from './model'
 
-export type Delimiter = ';' | ','
+export type Delimiter = ';' | ',' | '\t'
 
 export const DEFAULT_DELIMITER: Delimiter = ';'
 export const EXPORT_DELIMITER: Delimiter = ';'
@@ -19,6 +19,21 @@ export interface ImportSummary {
   correctedValues: number
   /** En-têtes des colonnes non reconnues, absentes de l'export. */
   ignoredColumns: string[]
+  /** Ajout seulement : en-têtes des colonnes de progression, non importées. */
+  ignoredProgressColumns: string[]
+  /** Ajout avec ligne de titres sur un jeu existant : langues soumises, informatives. */
+  submittedLanguages: Languages | null
+}
+
+/** `study` remplace le jeu de cartes avec sa progression ; `append` ajoute des mots au niveau Nouveau. */
+export type ImportMode = 'study' | 'append'
+
+export interface ParseOptions {
+  mode?: ImportMode
+  /** Ajout : langues du jeu existant (`null` ou absent s'il n'y a pas de vocabulaire). */
+  existingLanguages?: Languages | null
+  /** Ajout sur un jeu existant : la première ligne est une ligne de titres (sinon une donnée). */
+  headerRow?: boolean
 }
 
 export type ParseResult = { ok: true; summary: ImportSummary } | { ok: false; error: string }
@@ -59,10 +74,31 @@ function writeMastery(progress: Progress | null): string {
   return `S:${number(progress.stability)}|D:${number(progress.difficulty)}${progress.relearning ? '|R:1' : ''}`
 }
 
+/** Séparateur d'un texte collé : tabulation (cellules copiées d'un tableur) si la première ligne en contient une. */
+export function detectDelimiter(text: string, fallback: Delimiter = DEFAULT_DELIMITER): Delimiter {
+  const firstLine = (text.startsWith(BOM) ? text.slice(BOM.length) : text).split(/\r?\n/, 1)[0]
+  return firstLine.includes('\t') ? '\t' : fallback
+}
+
+const isProgressHeader = (header: string) => /^(maitrise|revu)_/.test(normalizeHeader(header))
+
 /** Lit un CSV de vocabulaire. N'a aucun effet de bord : l'appelant décide d'enregistrer. */
-export function parse(text: string, delimiter: Delimiter = DEFAULT_DELIMITER): ParseResult {
+export function parse(
+  text: string,
+  delimiter: Delimiter = DEFAULT_DELIMITER,
+  { mode = 'study', existingLanguages = null, headerRow = true }: ParseOptions = {},
+): ParseResult {
   const content = text.startsWith(BOM) ? text.slice(BOM.length) : text
   const rows = Papa.parse<string[]>(content, { delimiter, skipEmptyLines: 'greedy' }).data
+
+  // Ajout sur un jeu existant sans titres : toutes les lignes sont des mots, les langues sont celles du jeu.
+  if (mode === 'append' && existingLanguages && !headerRow) {
+    return readWords(rows, existingLanguages, null, {
+      ignoredColumns: [],
+      ignoredProgressColumns: [],
+      submittedLanguages: null,
+    })
+  }
 
   const header = (rows[0] ?? []).map((cell) => cell.trim())
   if (header.length < 2) {
@@ -80,6 +116,17 @@ export function parse(text: string, delimiter: Delimiter = DEFAULT_DELIMITER): P
     return { ok: false, error: `Les deux colonnes de langue portent le même nom (« ${languages.a} »).` }
   }
 
+  if (mode === 'append') {
+    // La progression n'est jamais importée à l'ajout ; les titres soumis ne servent qu'à l'information.
+    const ignoredProgressColumns = header.filter((h, i) => i > 1 && isProgressHeader(h))
+    const ignoredColumns = header.filter((h, i) => i > 1 && h !== '' && !isProgressHeader(h))
+    return readWords(rows.slice(1), existingLanguages ?? languages, null, {
+      ignoredColumns,
+      ignoredProgressColumns,
+      submittedLanguages: existingLanguages ? languages : null,
+    })
+  }
+
   // Position de chaque colonne de progression, repérée par son nom.
   const names = progressColumns(languages)
   const indexOf = (name: string) => header.findIndex((h) => normalizeHeader(h) === normalizeHeader(name))
@@ -90,13 +137,32 @@ export function parse(text: string, delimiter: Delimiter = DEFAULT_DELIMITER): P
   const known = new Set([0, 1, ...Object.values(columns.level), ...Object.values(columns.reviewed)])
   const ignoredColumns = header.filter((h, i) => !known.has(i) && h !== '')
 
-  const cell = (row: string[], index: number) => (index >= 0 ? (row[index] ?? '').trim() : '')
+  return readWords(rows.slice(1), languages, columns, {
+    ignoredColumns,
+    ignoredProgressColumns: [],
+    submittedLanguages: null,
+  })
+}
 
+interface ProgressColumns {
+  level: Record<Direction, number>
+  reviewed: Record<Direction, number>
+}
+
+const cell = (row: string[], index: number) => (index >= 0 ? (row[index] ?? '').trim() : '')
+
+/** Lit les lignes de mots. Sans `columns` (ajout), aucune progression n'est lue. */
+function readWords(
+  rows: string[][],
+  languages: Languages,
+  columns: ProgressColumns | null,
+  extras: Pick<ImportSummary, 'ignoredColumns' | 'ignoredProgressColumns' | 'submittedLanguages'>,
+): ParseResult {
   const words: NewWord[] = []
   let skippedRows = 0
   let correctedValues = 0
 
-  for (const row of rows.slice(1)) {
+  for (const row of rows) {
     const a = cell(row, 0)
     const b = cell(row, 1)
     if (a === '' || b === '') {
@@ -104,13 +170,15 @@ export function parse(text: string, delimiter: Delimiter = DEFAULT_DELIMITER): P
       continue
     }
     const word: NewWord = { a, b, ab: null, ba: null }
-    for (const direction of ['ab', 'ba'] as const) {
-      const { progress, corrected } = readProgress(
-        cell(row, columns.level[direction]),
-        cell(row, columns.reviewed[direction]),
-      )
-      word[direction] = progress
-      if (corrected) correctedValues++
+    if (columns) {
+      for (const direction of ['ab', 'ba'] as const) {
+        const { progress, corrected } = readProgress(
+          cell(row, columns.level[direction]),
+          cell(row, columns.reviewed[direction]),
+        )
+        word[direction] = progress
+        if (corrected) correctedValues++
+      }
     }
     words.push(word)
   }
@@ -119,7 +187,7 @@ export function parse(text: string, delimiter: Delimiter = DEFAULT_DELIMITER): P
     return { ok: false, error: 'Le fichier ne contient aucune ligne de vocabulaire dont les deux langues sont renseignées.' }
   }
 
-  return { ok: true, summary: { languages, words, skippedRows, correctedValues, ignoredColumns } }
+  return { ok: true, summary: { languages, words, skippedRows, correctedValues, ...extras } }
 }
 
 /** Produit le CSV d'export (séparateur « ; », UTF-8 avec BOM pour Excel). */

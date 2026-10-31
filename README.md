@@ -6,7 +6,7 @@ Version publiée : https://bhenriet.github.io/voc_trainer/
 
 ## Format du fichier CSV
 
-- Encodage UTF-8 (dans Excel : « CSV UTF-8 »), séparateur `;` par défaut (`,` au choix à l'import).
+- Encodage UTF-8 (dans Excel : « CSV UTF-8 »), séparateur `;` par défaut (`,` ou tabulation au choix à l'import).
 - La première ligne est un en-tête. Les deux premières colonnes sont les langues ; leur en-tête nomme la langue.
 - Plusieurs réponses acceptées se séparent par `/` : `maison / foyer`.
 
@@ -37,15 +37,24 @@ Niveaux affichés, déduits de la stabilité : Nouveau (jamais révisé), 1 En a
 
 Les autres colonnes sont ignorées et ne figurent pas dans l'export.
 
+## Deux façons d'importer
+
+Depuis l'accueil, deux entrées, chacune avec une source au choix : **fichier**, ou **collage** de cellules copiées dans Excel ou Google Sheets (séparateur tabulation reconnu automatiquement).
+
+- **Étudier un jeu de cartes** : remplace le vocabulaire et la progression de l'appareil, après confirmation. La première ligne nomme les deux langues. C'est le mode pour restaurer un fichier exporté.
+- **Ajouter des cartes de vocabulaire** : ajoute des mots au jeu existant, au niveau « Nouveau » (les colonnes de progression sont ignorées). Les langues du jeu ne changent jamais. La case « Ma liste contient une colonne de titres » (décochée par défaut) indique si la première ligne est un titre : sans titres, la première colonne est ajoutée dans la langue A du jeu et la deuxième dans la langue B, sans autre vérification. Sans vocabulaire enregistré, cette entrée crée un nouveau jeu et la première ligne doit nommer les langues.
+
+Les doublons ne sont pas détectés : chaque ligne ajoutée crée un nouveau mot.
+
 ## Sauvegarde et transfert entre appareils
 
 La progression est enregistrée automatiquement dans le navigateur. Le CSV sert de sauvegarde et de moyen de transfert :
 
 1. **Exporter** sur l'appareil où vous avez révisé (le fichier contient vocabulaire et progression).
 2. Déposer le fichier dans un drive (Google Drive, OneDrive…).
-3. **Importer** ce fichier sur l'autre appareil.
+3. **Étudier un jeu de cartes** avec ce fichier sur l'autre appareil.
 
-L'import **remplace** tout le vocabulaire et toute la progression de l'appareil, après confirmation. Règle simple : on importe en arrivant, on exporte en partant.
+Cet import **remplace** tout le vocabulaire et toute la progression de l'appareil, après confirmation. Règle simple : on importe en arrivant, on exporte en partant.
 
 Des fichiers d'exemple sont disponibles dans [`samples/`](samples/).
 

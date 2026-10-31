@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ImportMode } from '../domain/csv'
   import { today } from '../domain/dates'
   import { LEVEL_LABELS, NEW_LABEL } from '../domain/mastery'
   import { DIRECTIONS, directionLabel, type Level } from '../domain/model'
@@ -13,7 +14,7 @@
     onExport,
   }: {
     vocabulary: Vocabulary | null
-    onImport: () => void
+    onImport: (mode: ImportMode) => void
     onStudy: () => void
     onExport: () => Promise<void>
   } = $props()
@@ -40,9 +41,9 @@
 {#if !vocabulary}
   <section class="card">
     <h2>Bienvenue</h2>
-    <p>Importez votre liste de vocabulaire au format CSV pour commencer à réviser.</p>
+    <p>Importez votre liste de vocabulaire, depuis un fichier CSV ou en collant des cellules copiées dans Excel ou Google Sheets.</p>
     <p>
-      La première ligne nomme les deux langues, puis une ligne par mot, séparée par un point-virgule :
+      La première ligne nomme les deux langues, puis une ligne par mot (colonnes séparées par un point-virgule dans un fichier CSV) :
     </p>
     <pre>fr;en
 maison;house
@@ -52,7 +53,8 @@ chien;dog</pre>
       réponses possibles se séparent par « / », par exemple <code>maison / foyer</code>.
     </p>
     <div class="actions stack">
-      <button class="primary" onclick={onImport}>Importer un fichier CSV</button>
+      <button class="primary" onclick={() => onImport('study')}>Étudier un jeu de cartes</button>
+      <button onclick={() => onImport('append')}>Ajouter des cartes de vocabulaire</button>
     </div>
   </section>
 {:else}
@@ -110,7 +112,8 @@ chien;dog</pre>
     </p>
     <div class="actions">
       <button onclick={exportNow} disabled={exporting}>Exporter en CSV</button>
-      <button onclick={onImport}>Importer un autre fichier</button>
+      <button onclick={() => onImport('study')}>Étudier un jeu de cartes</button>
+      <button onclick={() => onImport('append')}>Ajouter des cartes de vocabulaire</button>
     </div>
   </section>
 {/if}

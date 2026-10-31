@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { exportFileName, serialize, type ImportSummary } from './domain/csv'
+  import { exportFileName, serialize, type ImportMode, type ImportSummary } from './domain/csv'
   import { today } from './domain/dates'
   import type { Card } from './domain/model'
-  import { loadVocabulary, markExported, openDb, replaceAll, type Vocabulary } from './storage/db'
+  import { appendWords, loadVocabulary, markExported, openDb, replaceAll, type Vocabulary } from './storage/db'
   import Home from './ui/Home.svelte'
   import Import from './ui/Import.svelte'
   import Session from './ui/Session.svelte'
@@ -13,7 +13,7 @@
 
   type Screen =
     | { name: 'home' }
-    | { name: 'import' }
+    | { name: 'import'; mode: ImportMode }
     | { name: 'config' }
     | { name: 'session'; cards: Card[]; requested: number }
     | { name: 'summary'; results: CardResult[]; total: number }
@@ -44,8 +44,10 @@
     window.scrollTo(0, 0)
   }
 
-  async function importVocabulary(summary: ImportSummary) {
-    await replaceAll(db, summary.languages, summary.words)
+  async function importVocabulary(summary: ImportSummary, mode: ImportMode) {
+    // Sans vocabulaire, ajouter revient à créer un jeu : les langues viennent de la ligne de titres.
+    if (mode === 'append' && vocabulary) await appendWords(db, summary.words)
+    else await replaceAll(db, summary.languages, summary.words)
     await reload()
   }
 
@@ -78,7 +80,9 @@
     <div class="notice error">{loadError}</div>
   {:else if screen.name === 'import'}
     <Import
+      mode={screen.mode}
       existingCount={vocabulary?.words.length ?? 0}
+      existingLanguages={vocabulary?.meta.languages ?? null}
       onImport={importVocabulary}
       onDone={() => go({ name: 'home' })}
     />
@@ -106,7 +110,7 @@
   {:else}
     <Home
       {vocabulary}
-      onImport={() => go({ name: 'import' })}
+      onImport={(mode) => go({ name: 'import', mode })}
       onStudy={() => go({ name: 'config' })}
       onExport={exportVocabulary}
     />

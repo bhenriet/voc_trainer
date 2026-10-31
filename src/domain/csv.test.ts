@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { exportFileName, parse, serialize, type ImportSummary, type ParseResult } from './csv'
+import { detectDelimiter, exportFileName, parse, serialize, type ImportSummary, type ParseResult } from './csv'
 import { fromLegacyLevel, levelOf } from './mastery'
 import type { Progress } from './model'
 
@@ -186,5 +186,139 @@ describe('exportFileName', () => {
 
   it('neutralise les caractères interdits dans un nom de fichier', () => {
     expect(exportFileName({ a: 'fr/BE', b: 'nl' }, '2026-10-29')).toBe('vocabulaire_fr-BE_nl_2026-10-29.csv')
+  })
+})
+
+const PASTED = [
+  'Mot NL\tMot FR',
+  'Goeiedag!\tBonjour !',
+  'Hallo!\tSalut !',
+  'Hei!\tSalut !',
+  'Hoe gaat het met je?\tComment vas-tu ?',
+  'Ça va?\tÇa va ?',
+  'Wat is er mis?\tQu\'est-ce qui ne va pas ?',
+  'Beste Anja,\tChère Anja,',
+].join('\n')
+
+const existing = { a: 'nl', b: 'fr' }
+
+describe('detectDelimiter', () => {
+  it('reconnaît la tabulation sur la première ligne', () => {
+    expect(detectDelimiter(PASTED)).toBe('\t')
+    expect(detectDelimiter(PASTED, ',')).toBe('\t')
+  })
+
+  it('se replie sur le séparateur choisi sans tabulation', () => {
+    expect(detectDelimiter('fr;en\nmaison;house')).toBe(';')
+    expect(detectDelimiter('fr,en\nchien,dog', ',')).toBe(',')
+  })
+
+  it('ne regarde que la première ligne', () => {
+    expect(detectDelimiter('fr;en\nmaison\thouse')).toBe(';')
+  })
+})
+
+describe('parse : tabulation (texte collé)', () => {
+  it('lit les cellules copiées depuis un tableur, accents et ponctuation compris', () => {
+    const summary = ok(parse(PASTED, detectDelimiter(PASTED)))
+    expect(summary.languages).toEqual({ a: 'Mot NL', b: 'Mot FR' })
+    expect(summary.words).toHaveLength(7)
+    expect(summary.words[0]).toEqual({ a: 'Goeiedag!', b: 'Bonjour !', ab: null, ba: null })
+    expect(summary.words[4]).toMatchObject({ a: 'Ça va?', b: 'Ça va ?' })
+    expect(summary.words[5]).toMatchObject({ b: "Qu'est-ce qui ne va pas ?" })
+  })
+
+  it('lit un champ entre guillemets contenant une tabulation', () => {
+    const summary = ok(parse('nl\tfr\n"a\tb"\tc', '\t'))
+    expect(summary.words[0]).toMatchObject({ a: 'a\tb', b: 'c' })
+  })
+})
+
+describe('parse : ajout', () => {
+  it('sans titres, la première ligne est un mot et les langues sont celles du jeu', () => {
+    const summary = ok(parse('Goeiedag!\tBonjour !\nHallo!\tSalut !', '\t', { mode: 'append', existingLanguages: existing, headerRow: false }))
+    expect(summary.languages).toEqual(existing)
+    expect(summary.submittedLanguages).toBeNull()
+    expect(summary.words).toEqual([
+      { a: 'Goeiedag!', b: 'Bonjour !', ab: null, ba: null },
+      { a: 'Hallo!', b: 'Salut !', ab: null, ba: null },
+    ])
+  })
+
+  it('avec titres, ils sont informatifs et les langues du jeu sont conservées', () => {
+    const summary = ok(parse(PASTED, '\t', { mode: 'append', existingLanguages: existing, headerRow: true }))
+    expect(summary.languages).toEqual(existing)
+    expect(summary.submittedLanguages).toEqual({ a: 'Mot NL', b: 'Mot FR' })
+    expect(summary.words).toHaveLength(7)
+    expect(summary.words[0]).toMatchObject({ a: 'Goeiedag!' })
+  })
+
+  it('ignore la progression et la signale', () => {
+    const summary = ok(
+      parse('fr;en;maitrise_fr_en;revu_fr_en;note\nmaison;house;S:12.4|D:5.3;2026-10-28;x', ';', {
+        mode: 'append',
+        existingLanguages: { a: 'fr', b: 'en' },
+        headerRow: true,
+      }),
+    )
+    expect(summary.words[0]).toEqual({ a: 'maison', b: 'house', ab: null, ba: null })
+    expect(summary.ignoredProgressColumns).toEqual(['maitrise_fr_en', 'revu_fr_en'])
+    expect(summary.ignoredColumns).toEqual(['note'])
+    expect(summary.correctedValues).toBe(0)
+  })
+
+  it('sans vocabulaire existant, les titres nomment les langues du nouveau jeu', () => {
+    const summary = ok(parse(PASTED, '\t', { mode: 'append', existingLanguages: null }))
+    expect(summary.languages).toEqual({ a: 'Mot NL', b: 'Mot FR' })
+    expect(summary.submittedLanguages).toBeNull()
+    expect(summary.words).toHaveLength(7)
+  })
+
+  it('compte les lignes incomplètes ignorées', () => {
+    const summary = ok(parse('a\tb\nc\t\n\td', '\t', { mode: 'append', existingLanguages: existing, headerRow: false }))
+    expect(summary.words).toHaveLength(1)
+    expect(summary.skippedRows).toBe(2)
+  })
+
+  it('refuse une liste sans ligne valide', () => {
+    expect(error(parse('', '\t', { mode: 'append', existingLanguages: existing, headerRow: false }))).toMatch(/aucune ligne/)
+    expect(error(parse('nl\tfr\n', '\t', { mode: 'append', existingLanguages: existing, headerRow: true }))).toMatch(/aucune ligne/)
+  })
+
+  it('refuse une ligne de titres invalide', () => {
+    expect(error(parse('nl\nmot', '\t', { mode: 'append', existingLanguages: existing, headerRow: true }))).toMatch(/deux colonnes/)
+    expect(error(parse('nl\tnl\na\tb', '\t', { mode: 'append', existingLanguages: existing, headerRow: true }))).toMatch(/même nom/)
+  })
+})
+
+describe('exemple de la demande : 12 cellules collées', () => {
+  const full = [
+    'Mot NL\tMot FR',
+    'Goeiedag!\tBonjour !',
+    'Hallo!\tSalut !',
+    'Hei!\tSalut !',
+    'Dag Anja!\tBonjour Anja !',
+    'Hoe gaat het met je?\tComment vas-tu ?',
+    'Alles goed ?\tTout va bien ?',
+    'Ça va?\tÇa va ?',
+    'Wat is er mis?\tQu\'est-ce qui ne va pas ?',
+    'Hoe voel je je vandaag?\tComment te sens-tu aujourd\'hui ?',
+    'Gaat het al beter?\tÇa va déjà mieux ?',
+    'Alles oké?\tTout va bien ?',
+    'Beste Anja,\tChère Anja,',
+  ].join('\n')
+
+  it('crée un jeu de 12 mots, doublons de traduction conservés', () => {
+    const summary = ok(parse(full, detectDelimiter(full), { mode: 'append' }))
+    expect(summary.words).toHaveLength(12)
+    expect(summary.words.filter((w) => w.b === 'Salut !')).toHaveLength(2)
+    expect(summary.skippedRows).toBe(0)
+  })
+
+  it('ajoute 12 mots à un jeu nl/fr, titres cochés ou non', () => {
+    const withHeader = ok(parse(full, '\t', { mode: 'append', existingLanguages: existing, headerRow: true }))
+    const without = ok(parse(full, '\t', { mode: 'append', existingLanguages: existing, headerRow: false }))
+    expect(withHeader.words).toHaveLength(12)
+    expect(without.words).toHaveLength(13)
   })
 })

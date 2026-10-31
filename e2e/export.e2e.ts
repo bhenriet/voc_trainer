@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Page } from '@playwright/test'
-import { answer, chooseFile, importFresh, localDay, openImport, progressRow, startSession } from './helpers'
+import { answer, chooseFile, confirmImport, importFresh, localDay, openImport, progressRow, startSession } from './helpers'
 
 async function progressTable(page: Page) {
   return page.locator('table').innerText()
@@ -63,6 +63,7 @@ test('import d’un fichier avec progression : niveaux (déduits de la stabilit�
   await page.goto('./')
   await openImport(page)
   await chooseFile(page, { csv: 'fr;en;maitrise_fr_en;revu_fr_en\nmaison;house;S:12.4|D:5.3;2026-10-28' })
+  await confirmImport(page)
   await page.getByRole('button', { name: 'Continuer' }).click()
   await expect(page.getByRole('heading', { name: 'fr ↔ en' })).toBeVisible()
   expect(await progressRow(page, 'Bien connu')).toEqual(['1', '0'])
