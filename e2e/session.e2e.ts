@@ -68,6 +68,9 @@ test.describe('saisie et vérification', () => {
     { name: 'pas de tolérance aux fautes de frappe', csv: 'fr;en\nmaison;house', mode: 'fr → en', typed: 'hosue', feedback: 'Faux.' },
     { name: 'réponse vide comptée fausse', csv: 'fr;en\nmaison;house', mode: 'fr → en', typed: '', feedback: 'Faux.' },
     { name: 'accents manquants', csv: 'fr;en\nété;summer', mode: 'en → fr', typed: 'ete', feedback: 'Juste, mais attention aux accents : été' },
+    { name: 'ponctuation ignorée', csv: 'fr;en\nbonjour le monde;hello, world!', mode: 'fr → en', typed: 'hello world', feedback: 'Juste !' },
+    { name: 'trait d’union équivalent à une espace', csv: 'fr;en\npeut-être;maybe so', mode: 'en → fr', typed: 'peut être', feedback: 'Juste !' },
+    { name: 'terme entre parenthèses facultatif', csv: 'fr;en\nmanger;to eat (food)', mode: 'fr → en', typed: 'to eat', feedback: 'Juste !' },
     { name: 'accents erronés', csv: 'fr;en\nélève;pupil', mode: 'en → fr', typed: 'éléve', feedback: 'Juste, mais attention aux accents : élève' },
   ]
 
@@ -85,6 +88,13 @@ test.describe('saisie et vérification', () => {
     await startSession(page, 'fr → en', 1)
     await answer(page, 'flat')
     await expect(page.getByText('Réponses acceptées : house / home')).toBeVisible()
+  })
+
+  test('un « / » entre parenthèses ne sépare pas deux réponses affichées', async ({ page }) => {
+    await importFresh(page, { csv: 'fr;en\nfoyer;home (a/b) / house' })
+    await startSession(page, 'fr → en', 1)
+    await answer(page, 'flat')
+    await expect(page.getByText('Réponses acceptées : home (a/b) / house')).toBeVisible()
   })
 
   test('le champ a le focus ; Entrée valide puis passe à la carte suivante', async ({ page }) => {

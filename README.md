@@ -9,6 +9,7 @@ Version publiée : https://bhenriet.github.io/voc_trainer/
 - Encodage UTF-8 (dans Excel : « CSV UTF-8 »), séparateur `;` par défaut (`,` ou tabulation au choix à l'import).
 - La première ligne est un en-tête. Les deux premières colonnes sont les langues ; leur en-tête nomme la langue.
 - Plusieurs réponses acceptées se séparent par `/` : `maison / foyer`.
+- La vérification ignore la casse, les espaces en trop et la ponctuation (`.`, `,`, `!`, apostrophes) ; un trait d'union vaut une espace (`peut-être` = `peut être`). Un terme entre parenthèses est facultatif : `(se) lever` accepte `lever` et `se lever`.
 
 ```
 fr;en
